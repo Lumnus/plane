@@ -33,7 +33,8 @@ export const useCoreOAuthConfig = (oauthActionText: string): TOAuthConfigs => {
       (config?.is_google_enabled ||
         config?.is_github_enabled ||
         config?.is_gitlab_enabled ||
-        config?.is_gitea_enabled)) ||
+        config?.is_gitea_enabled ||
+        config?.is_oidc_enabled)) ||
     false;
   const oAuthOptions: TOAuthOption[] = [
     {
@@ -78,6 +79,20 @@ export const useCoreOAuthConfig = (oauthActionText: string): TOAuthConfigs => {
         window.location.assign(`${API_BASE_URL}/auth/gitea/${next_path ? `?next_path=${next_path}` : ``}`);
       },
       enabled: config?.is_gitea_enabled,
+    },
+    {
+      id: "oidc",
+      text: `${oauthActionText} with SSO`,
+      icon: (
+        <svg height={18} width={18} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" aria-label="SSO">
+          <rect x="3" y="11" width="18" height="11" rx="2" ry="2" />
+          <path d="M7 11V7a5 5 0 0 1 10 0v4" />
+        </svg>
+      ),
+      onClick: () => {
+        window.location.assign(`${API_BASE_URL}/auth/oidc/${next_path ? `?next_path=${next_path}` : ``}`);
+      },
+      enabled: config?.is_oidc_enabled,
     },
   ];
 

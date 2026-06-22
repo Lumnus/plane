@@ -65,6 +65,7 @@ from .invite import WorkspaceInvitationsViewset
 from .sticky import StickyViewSet
 
 from .issue_type import (
+    WorkspaceFeatureAPIEndpoint,
     ProjectFeatureAPIEndpoint,
     WorkItemTypeListCreateAPIEndpoint,
     WorkItemTypeDetailAPIEndpoint,

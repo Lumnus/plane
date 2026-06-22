@@ -23,7 +23,7 @@ from plane.api.serializers import (
     WorkItemTypeCreateUpdateSerializer,
 )
 from plane.app.permissions import ProjectMemberPermission
-from plane.db.models import IssueType, ProjectIssueType, Project
+from plane.db.models import IssueType, ProjectIssueType, Project, Workspace
 
 from .base import BaseAPIView
 
@@ -195,3 +195,30 @@ class WorkItemTypeDetailAPIEndpoint(BaseAPIView):
             )
         issue_type.delete()
         return Response(status=status.HTTP_204_NO_CONTENT)
+
+
+# CE has no workspace-OWNED work item types (types live per-project), so workspace
+# work_item_types is always False here -> the SDK/MCP resolve_work_item_type routes
+# to the per-project Mode B path (project features + project work-item-types).
+WORKSPACE_FEATURE_DEFAULTS = {
+    "project_grouping": False,
+    "initiatives": False,
+    "teams": False,
+    "customers": False,
+    "wiki": False,
+    "pi": False,
+    "work_item_types": False,
+}
+
+
+class WorkspaceFeatureAPIEndpoint(BaseAPIView):
+    """Get / update workspace feature flags (work_item_types is per-project in CE)."""
+
+    def get(self, request, slug):
+        Workspace.objects.get(slug=slug)  # validates slug + scopes auth
+        return Response(dict(WORKSPACE_FEATURE_DEFAULTS), status=status.HTTP_200_OK)
+
+    def patch(self, request, slug):
+        Workspace.objects.get(slug=slug)
+        # Accept the call; workspace-owned types are not a CE concept, stays per-project.
+        return Response(dict(WORKSPACE_FEATURE_DEFAULTS), status=status.HTTP_200_OK)

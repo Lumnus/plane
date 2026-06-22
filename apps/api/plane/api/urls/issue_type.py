@@ -7,6 +7,7 @@
 from django.urls import path
 
 from plane.api.views import (
+    WorkspaceFeatureAPIEndpoint,
     ProjectFeatureAPIEndpoint,
     WorkItemTypeListCreateAPIEndpoint,
     WorkItemTypeDetailAPIEndpoint,
@@ -14,6 +15,11 @@ from plane.api.views import (
 
 
 urlpatterns = [
+    path(
+        "workspaces/<str:slug>/features/",
+        WorkspaceFeatureAPIEndpoint.as_view(http_method_names=["get", "patch"]),
+        name="workspace-features",
+    ),
     path(
         "workspaces/<str:slug>/projects/<uuid:project_id>/features/",
         ProjectFeatureAPIEndpoint.as_view(http_method_names=["get", "patch"]),

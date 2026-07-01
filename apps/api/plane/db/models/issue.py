@@ -138,6 +138,9 @@ class Issue(ChangeTrackerMixin, ProjectBaseModel):
     description_html = models.TextField(blank=True, default="<p></p>")
     description_stripped = models.TextField(blank=True, null=True)
     description_binary = models.BinaryField(null=True)
+    # Lumnus: MD+YAML-frontmatter canonical body (AI-native). html/binary are
+    # human-editor projections derived from this on load (reverse-wire, Cell D).
+    description_md = models.TextField(blank=True, null=True)
     priority = models.CharField(
         max_length=30,
         choices=PRIORITY_CHOICES,
@@ -785,6 +788,7 @@ class IssueDescriptionVersion(ProjectBaseModel):
     description_html = models.TextField(blank=True, default="<p></p>")
     description_stripped = models.TextField(blank=True, null=True)
     description_json = models.JSONField(default=dict, blank=True)
+    description_md = models.TextField(blank=True, null=True)  # Lumnus: MD+YAML canonical body
     last_saved_at = models.DateTimeField(default=timezone.now)
     owned_by = models.ForeignKey(
         settings.AUTH_USER_MODEL,
@@ -815,6 +819,7 @@ class IssueDescriptionVersion(ProjectBaseModel):
                 description_html=issue.description_html,
                 description_stripped=issue.description_stripped,
                 description_json=issue.description_json,
+                description_md=issue.description_md,
             )
             return True
         except Exception as e:

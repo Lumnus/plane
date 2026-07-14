@@ -141,6 +141,12 @@ class IssueCreateSerializer(BaseSerializer):
             if sanitized_html is not None:
                 attrs["description_html"] = sanitized_html
 
+        # Lumnus: description_md is the canonical AI-native body. An HTML-only write means
+        # the MD projection is now stale — clear it so readers never trust a staler-than-html
+        # MD. Writers that send both (the web editor) keep both fresh.
+        if "description_html" in attrs and "description_md" not in (self.initial_data or {}):
+            attrs["description_md"] = None
+
         if "description_binary" in attrs and attrs["description_binary"]:
             is_valid, error_msg = validate_binary_data(attrs["description_binary"])
             if not is_valid:
@@ -924,12 +930,15 @@ class IssueLiteSerializer(DynamicBaseSerializer):
 
 class IssueDetailSerializer(IssueSerializer):
     description_html = serializers.CharField()
+    # Lumnus: MD+YAML-frontmatter canonical body (AI-native); html is the human-editor projection
+    description_md = serializers.CharField(allow_null=True, required=False)
     is_subscribed = serializers.BooleanField(read_only=True)
     is_intake = serializers.BooleanField(read_only=True)
 
     class Meta(IssueSerializer.Meta):
         fields = IssueSerializer.Meta.fields + [
             "description_html",
+            "description_md",
             "is_subscribed",
             "is_intake",
         ]

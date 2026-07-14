@@ -98,6 +98,12 @@ class IssueSerializer(BaseSerializer):
             if sanitized_html is not None:
                 data["description_html"] = sanitized_html
 
+        # Lumnus: description_md is the canonical AI-native body. An HTML-only write means
+        # the MD projection is now stale — clear it so readers never trust a staler-than-html
+        # MD. Writers that send both keep both fresh.
+        if "description_html" in data and "description_md" not in (self.initial_data or {}):
+            data["description_md"] = None
+
         if data.get("description_binary"):
             is_valid, error_msg = validate_binary_data(data["description_binary"])
             if not is_valid:

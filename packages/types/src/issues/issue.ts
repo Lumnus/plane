@@ -89,6 +89,8 @@ type IssueRelation = {
 
 export type TIssue = TBaseIssue & {
   description_html?: string;
+  // Lumnus: MD+YAML-frontmatter canonical body (AI-native); html is the human-editor projection
+  description_md?: string | null;
   is_subscribed?: boolean;
   parent?: Partial<TBaseIssue>;
   issue_reactions?: TIssueReaction[];

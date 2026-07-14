@@ -12,7 +12,7 @@ import { Controller, useForm } from "react-hook-form";
 import type { EditorRefApi, TExtensions } from "@plane/editor";
 import { useTranslation } from "@plane/i18n";
 import type { EFileAssetType, TNameDescriptionLoader } from "@plane/types";
-import { getDescriptionPlaceholderI18n } from "@plane/utils";
+import { composeMarkdownWithFrontmatter, getDescriptionPlaceholderI18n, splitMarkdownFrontmatter } from "@plane/utils";
 // components
 import { RichTextEditor } from "@/components/editor/rich-text";
 // hooks
@@ -62,6 +62,12 @@ type Props = {
    */
   initialValue: string | undefined;
   /**
+   * @description MD+YAML canonical body (description_md). When present it takes precedence
+   * over initialValue for editor content — the YAML frontmatter is preserved verbatim and
+   * the markdown body is loaded into the editor (parsed by the tiptap-markdown extension).
+   */
+  initialMarkdown?: string | null;
+  /**
    * @description Key, to ensure the editor is re-rendered when the key changes
    */
   key: string;
@@ -72,6 +78,7 @@ type Props = {
     value: {
       description_html: string;
       description_json: object | undefined;
+      description_md?: string;
     },
     isMigrationUpdate?: boolean
   ) => Promise<void>;
@@ -113,6 +120,7 @@ export const DescriptionInput = observer(function DescriptionInput(props: Props)
     editorRef,
     entityId,
     fileAssetType,
+    initialMarkdown,
     initialValue,
     issueSequenceId,
     onSubmit,
@@ -122,16 +130,27 @@ export const DescriptionInput = observer(function DescriptionInput(props: Props)
     swrDescription,
     workspaceSlug,
   } = props;
+  // MD-canonical load: when description_md is present, its body takes precedence over the
+  // HTML projection. The tiptap-markdown extension parses markdown initial content natively.
+  const { frontmatter: initialFrontmatter, body: initialMarkdownBody } = splitMarkdownFrontmatter(initialMarkdown);
+  const resolvedInitialValue = initialMarkdown?.trim() ? initialMarkdownBody : initialValue;
   // states
   const [localDescription, setLocalDescription] = useState<TFormData>({
     id: entityId,
-    description_html: initialValue?.trim() ?? "",
+    description_html: resolvedInitialValue?.trim() ?? "",
     isMigrationUpdate: false,
   });
   // ref to track if there are unsaved changes
   const hasUnsavedChanges = useRef(false);
   // ref to track last saved content (to skip onChange when content hasn't actually changed)
-  const lastSavedContent = useRef(initialValue?.trim() === "" ? "<p></p>" : (initialValue ?? "<p></p>"));
+  const lastSavedContent = useRef(
+    resolvedInitialValue?.trim() === "" ? "<p></p>" : (resolvedInitialValue ?? "<p></p>")
+  );
+  // agent-owned YAML frontmatter, preserved verbatim across human edit round-trips
+  const frontmatterRef = useRef<string | null>(initialFrontmatter);
+  // internal editor ref so description_md can be serialized at submit time even when the
+  // consumer doesn't pass an editorRef of its own
+  const internalEditorRef = useRef<EditorRefApi | null>(null);
   // store hooks
   const { getWorkspaceBySlug } = useWorkspace();
   const { uploadEditorAsset, duplicateEditorAsset } = useEditorAsset();
@@ -143,7 +162,7 @@ export const DescriptionInput = observer(function DescriptionInput(props: Props)
   const { handleSubmit, reset, control, setValue } = useForm<TFormData>({
     defaultValues: {
       id: entityId,
-      description_html: initialValue?.trim() ?? "",
+      description_html: resolvedInitialValue?.trim() ?? "",
       isMigrationUpdate: false,
     },
   });
@@ -151,10 +170,16 @@ export const DescriptionInput = observer(function DescriptionInput(props: Props)
   // submit handler
   const handleDescriptionFormSubmit = useCallback(
     async (formData: TFormData) => {
+      // serialize the MD-canonical body alongside the HTML projection; the agent-owned
+      // frontmatter is re-attached verbatim
+      const markdownBody = internalEditorRef.current ? internalEditorRef.current.getMarkDown() : undefined;
       await onSubmit(
         {
           description_html: formData.description_html,
           description_json: formData.description_json,
+          ...(markdownBody !== undefined
+            ? { description_md: composeMarkdownWithFrontmatter(frontmatterRef.current, markdownBody) }
+            : {}),
         },
         formData.isMigrationUpdate
       );
@@ -167,9 +192,10 @@ export const DescriptionInput = observer(function DescriptionInput(props: Props)
   // reset form values
   useEffect(() => {
     if (!entityId) return;
-    const normalizedValue = initialValue?.trim() === "" ? "<p></p>" : (initialValue ?? "<p></p>");
+    const normalizedValue = resolvedInitialValue?.trim() === "" ? "<p></p>" : (resolvedInitialValue ?? "<p></p>");
     // Update last saved content when entity/initialValue changes
     lastSavedContent.current = normalizedValue;
+    frontmatterRef.current = initialFrontmatter;
     reset({
       id: entityId,
       description_html: normalizedValue,
@@ -182,7 +208,8 @@ export const DescriptionInput = observer(function DescriptionInput(props: Props)
     });
     // Reset unsaved changes flag when form is reset
     hasUnsavedChanges.current = false;
-  }, [entityId, initialValue, reset]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [entityId, resolvedInitialValue, reset]);
 
   // ADDING handleDescriptionFormSubmit TO DEPENDENCY ARRAY PRODUCES ADVERSE EFFECTS
   // TODO: Verify the exhaustive-deps warning
@@ -232,7 +259,10 @@ export const DescriptionInput = observer(function DescriptionInput(props: Props)
         <RichTextEditor
           key={entityId}
           editable={!disabled}
-          ref={editorRef}
+          ref={(el: EditorRefApi | null) => {
+            internalEditorRef.current = el;
+            if (editorRef) (editorRef as React.MutableRefObject<EditorRefApi | null>).current = el;
+          }}
           id={entityId}
           issueSequenceId={issueSequenceId}
           disabledExtensions={disabledExtensions}

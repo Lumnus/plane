@@ -143,11 +143,14 @@ class IssueCreateSerializer(BaseSerializer):
             if sanitized_html is not None:
                 attrs["description_html"] = sanitized_html
 
-        # Lumnus: description_md is the canonical AI-native body. An HTML-only write means
-        # the MD projection is now stale — clear it so readers never trust a staler-than-html
-        # MD. Writers that send both (the web editor) keep both fresh.
-        if "description_html" in attrs and "description_md" not in (self.initial_data or {}):
-            attrs["description_md"] = None
+        # Lumnus singular-store: description_md is the ONLY body source. An HTML-only
+        # write is converted html→md here at the boundary; Issue.save() then derives the
+        # html projection back from md. Writers that send md directly skip conversion —
+        # their client html (if any) is discarded by the save-derivation.
+        if attrs.get("description_html") and not (self.initial_data or {}).get("description_md"):
+            from plane.utils.markdown_body import convert_html_to_markdown
+
+            attrs["description_md"] = convert_html_to_markdown(attrs["description_html"])
 
         if "description_binary" in attrs and attrs["description_binary"]:
             is_valid, error_msg = validate_binary_data(attrs["description_binary"])
@@ -703,6 +706,8 @@ class IssueVoteSerializer(BaseSerializer):
 
 
 class IssueCommentSerializer(BaseSerializer):
+    # Lumnus singular-store: MD canonical comment body; byte-perfect (no whitespace trim).
+    comment_md = serializers.CharField(trim_whitespace=False, allow_null=True, required=False)
     actor_detail = UserLiteSerializer(read_only=True, source="actor")
     issue_detail = IssueFlatSerializer(read_only=True, source="issue")
     project_detail = ProjectLiteSerializer(read_only=True, source="project")
@@ -722,6 +727,15 @@ class IssueCommentSerializer(BaseSerializer):
             "created_at",
             "updated_at",
         ]
+
+    def validate(self, attrs):
+        # Lumnus singular-store: html-only comment write converted html→md at the boundary;
+        # IssueComment.save() derives html back from md.
+        if attrs.get("comment_html") and not (self.initial_data or {}).get("comment_md"):
+            from plane.utils.markdown_body import convert_html_to_markdown
+
+            attrs["comment_md"] = convert_html_to_markdown(attrs["comment_html"])
+        return attrs
 
 
 class IssueStateFlatSerializer(BaseSerializer):

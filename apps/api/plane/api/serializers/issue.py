@@ -101,11 +101,12 @@ class IssueSerializer(BaseSerializer):
             if sanitized_html is not None:
                 data["description_html"] = sanitized_html
 
-        # Lumnus: description_md is the canonical AI-native body. An HTML-only write means
-        # the MD projection is now stale — clear it so readers never trust a staler-than-html
-        # MD. Writers that send both keep both fresh.
-        if "description_html" in data and "description_md" not in (self.initial_data or {}):
-            data["description_md"] = None
+        # Lumnus singular-store: description_md is the ONLY body source. An HTML-only
+        # write is converted html→md at the boundary; Issue.save() derives html back from md.
+        if data.get("description_html") and not (self.initial_data or {}).get("description_md"):
+            from plane.utils.markdown_body import convert_html_to_markdown
+
+            data["description_md"] = convert_html_to_markdown(data["description_html"])
 
         if data.get("description_binary"):
             is_valid, error_msg = validate_binary_data(data["description_binary"])
@@ -738,6 +739,8 @@ class IssueCommentSerializer(BaseSerializer):
     """
 
     is_member = serializers.BooleanField(read_only=True)
+    # Lumnus singular-store: MD canonical comment body; byte-perfect (no whitespace trim).
+    comment_md = serializers.CharField(trim_whitespace=False, allow_null=True, required=False)
 
     class Meta:
         model = IssueComment
@@ -762,6 +765,13 @@ class IssueCommentSerializer(BaseSerializer):
 
         except Exception:
             raise serializers.ValidationError("Invalid HTML passed")
+
+        # Lumnus singular-store: html-only comment write converted html→md at the boundary;
+        # IssueComment.save() derives html back from md.
+        if data.get("comment_html") and not (self.initial_data or {}).get("comment_md"):
+            from plane.utils.markdown_body import convert_html_to_markdown
+
+            data["comment_md"] = convert_html_to_markdown(data["comment_html"])
         return data
 
 

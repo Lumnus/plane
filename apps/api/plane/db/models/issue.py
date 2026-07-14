@@ -184,6 +184,18 @@ class Issue(ChangeTrackerMixin, ProjectBaseModel):
         self._ensure_default_state()
         kwargs = self._sync_completed_at(kwargs)
 
+        # Lumnus singular-store: description_md is the sole body source; html/stripped
+        # are projections derived here on EVERY save (deterministic — no staleness room).
+        if self.description_md:
+            from plane.utils.markdown_body import derive_html_from_markdown
+
+            self.description_html = derive_html_from_markdown(self.description_md)
+            self.description_stripped = strip_tags(self.description_html)
+            if "update_fields" in kwargs and kwargs["update_fields"] is not None:
+                kwargs["update_fields"] = list(
+                    set(kwargs["update_fields"]) | {"description_html", "description_stripped"}
+                )
+
         if self._state.adding:
             with transaction.atomic():
                 # Create a lock for this specific project using a transaction-level advisory lock
@@ -455,6 +467,8 @@ class IssueComment(ChangeTrackerMixin, ProjectBaseModel):
     comment_stripped = models.TextField(verbose_name="Comment", blank=True)
     comment_json = models.JSONField(blank=True, default=dict)
     comment_html = models.TextField(blank=True, default="<p></p>")
+    # Lumnus singular-store: MD+YAML canonical comment body; html/stripped derived on save.
+    comment_md = models.TextField(blank=True, null=True)
     description = models.OneToOneField(
         "db.Description", on_delete=models.CASCADE, related_name="issue_comment_description", null=True
     )
@@ -479,7 +493,7 @@ class IssueComment(ChangeTrackerMixin, ProjectBaseModel):
         "self", on_delete=models.CASCADE, null=True, blank=True, related_name="parent_issue_comment"
     )
 
-    TRACKED_FIELDS = ["comment_stripped", "comment_json", "comment_html"]
+    TRACKED_FIELDS = ["comment_stripped", "comment_json", "comment_html", "comment_md"]
 
     def save(self, *args, **kwargs):
         """
@@ -488,6 +502,12 @@ class IssueComment(ChangeTrackerMixin, ProjectBaseModel):
         This method handles creation and updates of both the comment and its description in a
         single atomic transaction to ensure data consistency.
         """
+
+        # Lumnus singular-store: comment_md is the sole body source when present.
+        if self.comment_md:
+            from plane.utils.markdown_body import derive_html_from_markdown
+
+            self.comment_html = derive_html_from_markdown(self.comment_md)
 
         self.comment_stripped = strip_tags(self.comment_html) if self.comment_html != "" else ""
         is_creating = self._state.adding

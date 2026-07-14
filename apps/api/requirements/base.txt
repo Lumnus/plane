@@ -75,3 +75,8 @@ opentelemetry-exporter-otlp-proto-grpc==1.28.1
 drf-spectacular==0.28.0
 # html sanitizer
 nh3==0.2.18
+# Lumnus singular-store body: md->html projection (markdown-it parity w/ editor) + html->md boundary conversion
+markdown-it-py==3.0.0
+mdit-py-plugins==0.4.2
+linkify-it-py==2.0.3
+markdownify==0.13.1

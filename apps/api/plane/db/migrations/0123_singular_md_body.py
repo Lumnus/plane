@@ -14,8 +14,10 @@ def backfill_markdown(apps, schema_editor):
     Issue = apps.get_model("db", "Issue")
     IssueComment = apps.get_model("db", "IssueComment")
 
+    # historical models don't expose .objects when the live model uses custom managers
+    # without use_in_migrations — _base_manager is always present
     for issue in (
-        Issue.objects.filter(description_md__isnull=True)
+        Issue._base_manager.filter(description_md__isnull=True)
         .exclude(description_html__in=["", "<p></p>"])
         .only("id", "description_html")
         .iterator()
@@ -23,17 +25,17 @@ def backfill_markdown(apps, schema_editor):
         md = convert_html_to_markdown(issue.description_html)
         if md:
             # historical model — plain save, no custom derivation runs
-            Issue.objects.filter(pk=issue.pk).update(description_md=md)
+            Issue._base_manager.filter(pk=issue.pk).update(description_md=md)
 
     for comment in (
-        IssueComment.objects.filter(comment_md__isnull=True)
+        IssueComment._base_manager.filter(comment_md__isnull=True)
         .exclude(comment_html__in=["", "<p></p>"])
         .only("id", "comment_html")
         .iterator()
     ):
         md = convert_html_to_markdown(comment.comment_html)
         if md:
-            IssueComment.objects.filter(pk=comment.pk).update(comment_md=md)
+            IssueComment._base_manager.filter(pk=comment.pk).update(comment_md=md)
 
 
 class Migration(migrations.Migration):

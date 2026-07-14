@@ -705,11 +705,15 @@ class IssueCommentCreateSerializer(BaseSerializer):
     access control, and external integration tracking.
     """
 
+    # Lumnus singular-store: MD canonical comment body; byte-perfect (no whitespace trim).
+    comment_md = serializers.CharField(trim_whitespace=False, allow_null=True, required=False)
+
     class Meta:
         model = IssueComment
         fields = [
             "comment_json",
             "comment_html",
+            "comment_md",
             "access",
             "external_source",
             "external_id",
@@ -729,6 +733,16 @@ class IssueCommentCreateSerializer(BaseSerializer):
             "edited_at",
         ]
 
+
+
+    def validate(self, data):
+        # Lumnus singular-store: html-only comment write converted html→md at the boundary;
+        # IssueComment.save() derives html back from md.
+        if data.get("comment_html") and not (self.initial_data or {}).get("comment_md"):
+            from plane.utils.markdown_body import convert_html_to_markdown
+
+            data["comment_md"] = convert_html_to_markdown(data["comment_html"])
+        return data
 
 class IssueCommentSerializer(BaseSerializer):
     """

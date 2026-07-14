@@ -59,7 +59,15 @@ def convert_html_to_markdown(html_text):
     """
     if not html_text:
         return ""
-    md = markdownify(html_text, heading_style="ATX", bullets="-")
+    md = markdownify(
+        html_text,
+        heading_style="ATX",
+        bullets="-",
+        # AI-native store: don't backslash-escape prose that merely resembles markdown
+        escape_asterisks=False,
+        escape_underscores=False,
+        escape_misc=False,
+    )
     # collapse the >2 blank lines markdownify tends to leave around block elements
     md = re.sub(r"\n{3,}", "\n\n", md).strip()
     return md + "\n" if md else ""

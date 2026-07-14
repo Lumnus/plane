@@ -99,6 +99,8 @@ class IssueCreateSerializer(BaseSerializer):
     )
     project_id = serializers.UUIDField(source="project.id", read_only=True)
     workspace_id = serializers.UUIDField(source="workspace.id", read_only=True)
+    # Lumnus: MD-canonical body must round-trip byte-perfect; disable DRF whitespace-trim.
+    description_md = serializers.CharField(trim_whitespace=False, allow_null=True, required=False)
 
     class Meta:
         model = Issue
@@ -931,7 +933,7 @@ class IssueLiteSerializer(DynamicBaseSerializer):
 class IssueDetailSerializer(IssueSerializer):
     description_html = serializers.CharField()
     # Lumnus: MD+YAML-frontmatter canonical body (AI-native); html is the human-editor projection
-    description_md = serializers.CharField(allow_null=True, required=False)
+    description_md = serializers.CharField(trim_whitespace=False, allow_null=True, required=False)
     is_subscribed = serializers.BooleanField(read_only=True)
     is_intake = serializers.BooleanField(read_only=True)
 

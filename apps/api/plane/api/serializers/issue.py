@@ -66,6 +66,9 @@ class IssueSerializer(BaseSerializer):
     type_id = serializers.PrimaryKeyRelatedField(
         source="type", queryset=IssueType.objects.all(), required=False, allow_null=True
     )
+    # Lumnus: MD-canonical body must round-trip byte-perfect (source_hash CAS depends on it);
+    # DRF CharField trims trailing whitespace by default — disable.
+    description_md = serializers.CharField(trim_whitespace=False, allow_null=True, required=False)
 
     class Meta:
         model = Issue

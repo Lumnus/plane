@@ -141,6 +141,10 @@ class Issue(ChangeTrackerMixin, ProjectBaseModel):
     # Lumnus: MD+YAML-frontmatter canonical body (AI-native). html/binary are
     # human-editor projections derived from this on load (reverse-wire, Cell D).
     description_md = models.TextField(blank=True, null=True)
+    # Lumnus: substrate-stable identity anchor (task_projection.projection_map key).
+    # Auto-exposed on the external API (exclude-style Meta) + webhook payloads
+    # (__all__-style Meta); the projector writes it, ESB fan-in resolves deltas by it.
+    work_item_gid = models.CharField(max_length=255, blank=True, null=True, db_index=True)
     priority = models.CharField(
         max_length=30,
         choices=PRIORITY_CHOICES,
